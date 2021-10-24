@@ -1,0 +1,16 @@
+{
+  "name": "trending_v2",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@sheeptester/htmlifier": "^1.0.3",
+    "colors": "^1.4.0",
+    "inquirer": "^8.2.0",
+    "jszip": "^3.7.1",
+    "log-update": "^5.0.0",
+    "node-fetch": "^3.0.0",
+    "yargs": "^17.2.1"
+  }
+}
