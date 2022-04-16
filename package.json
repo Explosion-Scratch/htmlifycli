@@ -1,11 +1,15 @@
 {
-  "name": "trending_v2",
-  "version": "1.0.0",
+  "name": "htmlifycli",
+  "description": "A beautiful CLI for HTMLifying scratch projects.",
+  "version": "1.0.3",
   "type": "module",
   "main": "index.js",
   "license": "MIT",
+  "bin": {
+    "htmlify": "./index.js"
+  },
   "dependencies": {
-    "@sheeptester/htmlifier": "^1.0.3",
+    "@turbowarp/packager": "^0.7.2",
     "colors": "^1.4.0",
     "inquirer": "^8.2.0",
     "jszip": "^3.7.1",
