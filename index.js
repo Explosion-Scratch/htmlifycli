@@ -124,7 +124,7 @@ console.clear();
     {
       name: "maxClones",
       message: "Maximum clones",
-      default: 300,
+      default: 1000,
       type: "number",
     },
     {
@@ -156,7 +156,7 @@ console.clear();
       name: "customize",
       message: "Customize the default settings?",
       type: "confirm",
-      default: true,
+      default: false,
     },
   ]);
 
@@ -180,7 +180,7 @@ console.clear();
       let current = { length: 20 };
       let i = 0;
       while (current.length >= 20 && out.length < opts.sourceOptions.limit) {
-        CURRENT.status = `Getting page ${i}`.brightBlue;
+        CURRENT.status = `Getting page ${i}` /*.brightBlue*/;
         let url = {
           user: () => `users/${opts.sourceOptions.user}/projects?`,
           studio: () => `studios/${opts.sourceOptions.id}/projects/?limit=20&`,
@@ -205,9 +205,10 @@ console.clear();
   CURRENT.status = "Getting projects";
   log();
   let projectPromises = [];
-  for (let project of projects) {
+  for (let i in projects) {
     projectPromises.push(
       (async () => {
+        let project = projects[i];
         CURRENT.projects[project.id] = "Fetching".yellow;
         let ab = await (
           await fetch(`https://projects.scratch.mit.edu/${project.id}`)
@@ -225,7 +226,7 @@ console.clear();
           CURRENT.projects[project.id] = `${`[${type}]`.yellow} ${
             typeof a === "string"
               ? a
-              : a < 1
+              : a <= 1
               ? `${~~(a * 100)}%`.brightGreen
               : `${a} assets downloaded`.brightBlue
           }`;
@@ -272,10 +273,10 @@ console.clear();
         if (data instanceof ArrayBuffer) {
           data = new Uint8Array(data);
         }
-        CURRENT.projects[project.id] = "Writing file";
+        CURRENT.projects[project.id] = "Writing file".green;
         log();
         fs.writeFileSync(`${name}.${type.split("/")[1]}`, data);
-        CURRENT.projects[project.id] = "Finished".brightGreen;
+        CURRENT.projects[project.id] = "Finished".green;
         log();
       })()
     );
@@ -285,7 +286,7 @@ console.clear();
     (p) => (
       (projects = p),
       (CURRENT.status = "Finished"),
-      logUpdate(`✅ ${`Finished`.bold.green}`),
+      logUpdate(`✅ ${`Finished`.green}`),
       process.exit(0)
     )
   );
@@ -353,21 +354,46 @@ console.clear();
     ];
     spinner = spinners[SPINNER_INDEX % spinners.length];
     spinner = `${spinner[Math.floor(Date.now() / 50) % spinner.length]}`;
-
-    let logThis = `${spinner} ${CURRENT.status}`.yellow;
-
-    if (Object.entries(CURRENT.projects).length === 1) {
-      logThis += "\n\n";
-      logThis += Object.entries(CURRENT.projects)
-        .map(([k, v]) => `${`[${k}]`.yellow} ${v}`)
-        .join("\n");
-    } else if (Object.entries(CURRENT.projects).length) {
-      logThis += `\n\nDownloading projects ${
+    if (Object.entries(CURRENT.projects).length) {
+      CURRENT.status = `Downloading projects ${
         `[${
           Object.values(CURRENT.projects).filter((i) => i.includes("Finished"))
             .length
         }/${Object.keys(CURRENT.projects).length}]`.yellow
       }`;
+    }
+
+    let logThis = `${spinner} ${CURRENT.status}`.yellow;
+
+    if (Object.entries(CURRENT.projects).length) {
+      logThis += "\n\n";
+      let newlog = Object.entries(CURRENT.projects)
+        .sort((a, b) => {
+          // Get IDs
+          a = a[0];
+          b = b[0];
+          a = projects.find((i) => i.id == a).title;
+          b = projects.find((i) => i.id == b).title;
+          // Alphabetically
+          return a.localeCompare(b);
+        })
+        .filter((i) => !i[1].includes("Fetching") && !i[1].includes("0%"))
+        .slice(0, 10)
+        .map(
+          ([k, v]) =>
+            `${
+              `[${niceslice(projects.find((i) => i.id == k).title)}]`.padEnd(
+                40,
+                " "
+              ).yellow
+            }\t${v}`
+        )
+        .join("\n");
+      if (newlog.trim().length) {
+        logThis += newlog;
+      } else {
+        logThis += `\nNo projects currently downloading`.yellow;
+      }
     }
 
     logUpdate(logThis);
@@ -399,4 +425,7 @@ function throttle(callback, limit) {
       }, limit);
     }
   };
+}
+function niceslice(str, len = 30) {
+  return str.length >= len ? str.slice(0, len - 3) + "..." : str;
 }
