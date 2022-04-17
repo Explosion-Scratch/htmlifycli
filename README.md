@@ -12,6 +12,6 @@ npm i -g htmlifycli
 htmlify
 ```
 
-
-https://user-images.githubusercontent.com/61319150/163723080-e27b273a-0662-4e1a-b996-6333fa167942.mp4
+(oh also with this recording don't worry about the question mark loading things being weird, I fixed that)
+https://user-images.githubusercontent.com/61319150/163723907-ccdb719a-43ee-46c4-9773-cb31c08d1124.mp4
 
