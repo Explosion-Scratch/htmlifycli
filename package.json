@@ -1,12 +1,14 @@
 {
   "name": "htmlifycli",
   "description": "A beautiful CLI for HTMLifying scratch projects.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "main": "index.js",
   "license": "MIT",
   "bin": {
-    "htmlify": "./index.js"
+    "htmlify": "./index.js",
+    "htmlifycli": "./index.js",
+    "sdl": "./index.js"
   },
   "dependencies": {
     "@turbowarp/packager": "^0.7.2",

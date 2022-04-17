@@ -3,16 +3,17 @@ import fetch from "node-fetch";
 import colors from "colors";
 import inquirer from "inquirer";
 import logUpdate from "log-update";
-import { resolve } from "path";
+import { join } from "path";
 import Packager from "@turbowarp/packager";
+console.clear();
 
 (async () => {
+  log = throttle(trycatch(log), 100);
   const CURRENT = {
     logInterval: null,
     status: "Waiting for user input",
     projects: {},
   };
-
   const _slist = {
     id: "A single project from an ID",
     studio: "From a studio",
@@ -71,7 +72,7 @@ import Packager from "@turbowarp/packager";
   const sourceOptions = await inquirer.prompt([
     ...sources[source],
     { type: "number", name: "limit", default: 100, message: "Project limit" },
-    // { type: "list", choices: ["zip", "html"], default: "html" },
+    { name: "target", type: "list", choices: ["zip", "html"], default: "html" },
   ]);
 
   const features = {
@@ -99,6 +100,29 @@ import Packager from "@turbowarp/packager";
       default: 30,
     },
     {
+      name: "stageWidth",
+      message: "Stage width",
+      default: 480,
+      type: "number",
+    },
+    {
+      name: "stageHeight",
+      message: "Stage height",
+      default: 360,
+      type: "number",
+    },
+    {
+      name: "username",
+      message: "Username",
+      default: "player##",
+    },
+    {
+      name: "maxClones",
+      message: "Maximum clones",
+      default: 300,
+      type: "number",
+    },
+    {
       type: "checkbox",
       name: "features",
       message: "What do you want enabled?",
@@ -117,7 +141,7 @@ import Packager from "@turbowarp/packager";
   const opts = { source, sourceOptions, projectOptions };
   CURRENT.logInterval = setInterval(log, 50);
   CURRENT.status = "Fetching projects";
-
+  log();
   let projects = await (async () => {
     if (opts.source === "id") {
       return [
@@ -147,32 +171,36 @@ import Packager from "@turbowarp/packager";
   CURRENT.projects = Object.fromEntries(
     projects.map((i) => [i.id, "Fetching".brightBlue])
   );
+  log();
   let folder = opts.projectOptions.folder.replace(/\/$/, "");
   CURRENT.status = "Creating folder";
+  log();
   fs.mkdirSync(folder, { recursive: true });
   CURRENT.status = "Getting projects";
+  log();
   let projectPromises = [];
   for (let project of projects) {
     projectPromises.push(
       (async () => {
+        CURRENT.projects[project.id] = "Fetching".yellow;
         let ab = await (
           await fetch(`https://projects.scratch.mit.edu/${project.id}`)
         ).arrayBuffer();
-        const name = `${folder}/${project.title.replace(
-          /[/\\?%*:|"<>]/g,
-          "-"
-        )}`;
+        const name = join(folder, project.title.replace(/[/\\?%*:|"<>]/g, "-"));
         if (fs.existsSync(name)) {
-          CURRENT[project.id] =
+          CURRENT.projects[project.id] =
             `File already exists (${project.title.brightBlue})`.brightYellow;
+          log();
         }
-        CURRENT[project.id] = "Loading project".brightBlue;
+        CURRENT.projects[project.id] = "Loading project".brightBlue;
+        log();
         let loaded = await Packager.loadProject(ab, (type, a, b) => {
-          CURRENT[project.id] = `${`[${type}]`.yellow} ${
+          CURRENT.projects[project.id] = `${`[${type}]`.yellow} ${
             typeof a === "string" ? a : `${a * 100}%`.brightGreen
           }`;
         });
-        CURRENT[project.id] = "Packaging".brightBlue;
+        CURRENT.projects[project.id] = "Packaging".brightBlue;
+        log();
         const packager = new Packager.Packager(loaded);
         let f = Object.fromEntries(
           Object.entries(features).map(([k, v]) => [
@@ -187,38 +215,141 @@ import Packager from "@turbowarp/packager";
           compiler: {
             enabled: f.compilerEnable,
           },
+          ...f,
+          target: sourceOptions.target,
+          ...projectOptions,
         };
         Object.assign(packager.options, f);
         packager.project = loaded;
         const { type, data } = await packager.package();
-        CURRENT[project.id] = "Writing file";
+        if (data instanceof ArrayBuffer) {
+          data = new Uint8Array(data);
+        }
+        CURRENT.projects[project.id] = "Writing file";
+        log();
         fs.writeFileSync(`${name}.${type.split("/")[1]}`, data);
-        CURRENT[project.id] = "Finished".brightGreen;
+        CURRENT.projects[project.id] = "Finished".brightGreen;
+        log();
       })()
     );
   }
 
   Promise.all(projectPromises).then(
-    (p) => ((projects = p), (CURRENT.status = "Finished"), process.exit(0))
+    (p) => (
+      (projects = p),
+      (CURRENT.status = "Finished"),
+      logUpdate(`✅ ${`Finished`.bold.green}`),
+      process.exit(0)
+    )
   );
 
   function log() {
+    // Change every 10 seconds
+    const SPINNER_INDEX = ~~(Date.now() / 10000);
     let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    let earthSpinner = ["🌍 ", "🌎 ", "🌏 "]
+      .map((i) => i.repeat(4).split(""))
+      .flat();
+    let dotsSpinner2 = ["⢄", "⢂", "⢁", "⡁", "⡈", "⡐", "⡠"];
+    let runnerSpinner = ["🚶 ", "🏃 "].map((i) => i.repeat(4).split("")).flat();
+    let weatherSpinner = [
+      "☀️ ",
+      "☀️ ",
+      "☀️ ",
+      "🌤 ",
+      "⛅️ ",
+      "🌥 ",
+      "☁️ ",
+      "🌧 ",
+      "🌨 ",
+      "🌧 ",
+      "🌨 ",
+      "🌧 ",
+      "🌨 ",
+      "⛈ ",
+      "🌨 ",
+      "🌧 ",
+      "🌨 ",
+      "☁️ ",
+      "🌥 ",
+      "⛅️ ",
+      "🌤 ",
+      "☀️ ",
+      "☀️ ",
+    ];
+    let arrowSpinner = ["⬆️ ", "↗️ ", "➡️ ", "↘️ ", "⬇️ ", "↙️ ", "⬅️ ", "↖️ "];
+    let clockSpinner = [
+      "🕛 ",
+      "🕐 ",
+      "🕑 ",
+      "🕒 ",
+      "🕓 ",
+      "🕔 ",
+      "🕕 ",
+      "🕖 ",
+      "🕗 ",
+      "🕘 ",
+      "🕙 ",
+      "🕚 ",
+    ];
 
+    let spinners = [
+      spinner,
+      weatherSpinner,
+      arrowSpinner,
+      clockSpinner,
+      earthSpinner,
+      runnerSpinner,
+      dotsSpinner2,
+    ];
+    spinner = spinners[SPINNER_INDEX % spinners.length];
     spinner = `${spinner[Math.floor(Date.now() / 50) % spinner.length]}`;
 
     let logThis = `${spinner} ${CURRENT.status}`.yellow;
 
     if (Object.entries(CURRENT.projects).length) {
-      logThis += "\n\n";
+      logThis += `\n\nDownloading projects ${
+        `[${
+          Object.values(CURRENT.projects).filter((i) => i.includes("Finished"))
+            .length
+        }/${Object.keys(CURRENT.projects).length}]`.yellow
+      }`;
+      /* logThis += "\n\n";
       logThis += Object.entries(CURRENT.projects)
         .map(([k, v]) => `${`[${k}]`.yellow} ${v}`)
-        .join("\n");
+        .join("\n"); */
     }
 
     logUpdate(logThis);
   }
 })();
+
+function trycatch(fn) {
+  return (...a) => {
+    try {
+      fn(...a);
+    } catch (e) {
+      console.clear();
+      console.error(e);
+      process.exit(1);
+    }
+  };
+}
+function throttle(callback, limit) {
+  var waiting = false; // Initially, we're not waiting
+  return function () {
+    // We return a throttled function
+    if (!waiting) {
+      // If we're not waiting
+      callback.apply(this, arguments); // Execute users function
+      waiting = true; // Prevent future invocations
+      setTimeout(function () {
+        // After a period of time
+        waiting = false; // And allow future invocations
+      }, limit);
+    }
+  };
+}
 
 /* (async () => {
 	const buttons = {
