@@ -254,10 +254,10 @@ console.clear();
     const SPINNER_INDEX = ~~(Date.now() / 10000);
     let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     let earthSpinner = ["🌍 ", "🌎 ", "🌏 "]
-      .map((i) => i.repeat(4).split(""))
+      .map((i) => new Array(4).fill(i))
       .flat();
     let dotsSpinner2 = ["⢄", "⢂", "⢁", "⡁", "⡈", "⡐", "⡠"];
-    let runnerSpinner = ["🚶 ", "🏃 "].map((i) => i.repeat(4).split("")).flat();
+    let runnerSpinner = ["🚶 ", "🏃 "].map((i) => new Array(4).fill(i)).flat();
     let weatherSpinner = [
       "☀️ ",
       "☀️ ",
@@ -282,7 +282,9 @@ console.clear();
       "🌤 ",
       "☀️ ",
       "☀️ ",
-    ];
+    ]
+      .map((i) => new Array(2).fill(i))
+      .flat();
     let arrowSpinner = ["⬆️ ", "↗️ ", "➡️ ", "↘️ ", "⬇️ ", "↙️ ", "⬅️ ", "↖️ "];
     let clockSpinner = [
       "🕛 ",
