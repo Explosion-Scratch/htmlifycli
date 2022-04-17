@@ -186,7 +186,8 @@ console.clear();
         let ab = await (
           await fetch(`https://projects.scratch.mit.edu/${project.id}`)
         ).arrayBuffer();
-        const name = join(folder, project.title.replace(/[/\\?%*:|"<>]/g, "-"));
+        let formattedTitle = project.title.replace(/[/\\?%*:|"<>]/g, "-");
+        const name = join(folder, formattedTitle);
         if (fs.existsSync(name)) {
           CURRENT.projects[project.id] =
             `File already exists (${project.title.brightBlue})`.brightYellow;
@@ -211,6 +212,7 @@ console.clear();
         f = {
           loadingScreen: {
             progressBar: f.loadingBar,
+            text: project.title,
           },
           compiler: {
             enabled: f.compilerEnable,
@@ -218,6 +220,10 @@ console.clear();
           ...f,
           target: sourceOptions.target,
           ...projectOptions,
+          app: {
+            windowTitle: formattedTitle,
+            packageName: formattedTitle,
+          },
         };
         Object.assign(packager.options, f);
         packager.project = loaded;
