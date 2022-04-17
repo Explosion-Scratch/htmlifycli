@@ -1,7 +1,7 @@
 {
   "name": "htmlifycli",
   "description": "A beautiful CLI for HTMLifying scratch projects.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "main": "index.js",
   "license": "MIT",
@@ -13,10 +13,8 @@
   "dependencies": {
     "@turbowarp/packager": "^0.7.2",
     "colors": "^1.4.0",
+    "cross-fetch": "^3.1.5",
     "inquirer": "^8.2.0",
-    "jszip": "^3.7.1",
-    "log-update": "^5.0.0",
-    "node-fetch": "^3.0.0",
-    "yargs": "^17.2.1"
+    "log-update": "^5.0.0"
   }
 }
