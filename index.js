@@ -6,6 +6,7 @@ const { join } = require("path");
 const Packager = require("@turbowarp/packager");
 
 (async () => {
+  const FAKE_WAIT_TIME = 200;
   const SANITIZE_RE = /[/\\?%*:|"<>]/g;
   console.clear();
   const { default: logUpdate } = await import("log-update");
@@ -39,7 +40,7 @@ const Packager = require("@turbowarp/packager");
         message: "What user's projects would you like to download?",
         default: "griffpatch",
         validate: async (id) => {
-          await new Promise((r) => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, FAKE_WAIT_TIME));
           let { code, message } = await fetch(
             `https://api.scratch.mit.edu/users/${encodeURIComponent(id)}`
           ).then((r) => r.json());
@@ -71,25 +72,18 @@ const Packager = require("@turbowarp/packager");
             return true;
           }
         },
-        filter: (a) => {
-          if (a.startsWith("http")) {
-            return a.split("/")[4];
-          } else {
-            return a;
-          }
-        },
         default: 100,
       },
     ],
     studio: [
       {
-        type: "number",
+        type: "string",
         name: "id",
         message:
           "What is the studio ID of the studio you want to download projects from?",
-        default: 25020410,
+        default: "25020410",
         validate: async (id) => {
-          await new Promise((r) => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, FAKE_WAIT_TIME));
           let { code, title } = await fetch(
             `https://api.scratch.mit.edu/studios/${encodeURIComponent(id)}`
           ).then((r) => r.json());
@@ -118,12 +112,12 @@ const Packager = require("@turbowarp/packager");
     ],
     id: [
       {
-        type: "number",
+        type: "string",
         name: "id",
         default: 60917032,
         message: "What's the project ID of the project?",
         validate: async (id) => {
-          await new Promise((r) => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, FAKE_WAIT_TIME));
           let res = await fetch(
             `https://api.scratch.mit.edu/projects/${encodeURIComponent(id)}`
           ).then((r) => r.json());
@@ -143,7 +137,16 @@ const Packager = require("@turbowarp/packager");
 
   const sourceOptions = await inquirer.prompt([
     ...sources[source],
-    { type: "number", name: "limit", default: 100, message: "Project limit" },
+    ...(source === "id"
+      ? []
+      : [
+          {
+            type: "number",
+            name: "limit",
+            default: 100,
+            message: "Project limit",
+          },
+        ]),
     {
       name: "target",
       message: "What output format do you want?",
@@ -152,7 +155,7 @@ const Packager = require("@turbowarp/packager");
       default: "html",
     },
   ]);
-
+  sourceOptions.limit = sourceOptions.limit || 100;
   const features = {
     label: "!Behavior features:",
     turbo: "Turbo mode",
@@ -177,7 +180,7 @@ const Packager = require("@turbowarp/packager");
       type: "input",
       name: "folder",
       message: "Folder to save projects in (will be created if non-existant)",
-      default: sourceOptions.user || "projects",
+      default: CURRENT.folderTitle || sourceOptions.user || "projects",
     },
     {
       type: "number",
@@ -250,6 +253,7 @@ const Packager = require("@turbowarp/packager");
     : Object.fromEntries(projectPrompt.map((i) => [i.name, i.default]));
 
   const opts = { source, sourceOptions, projectOptions };
+  console.clear();
   CURRENT.logInterval = setInterval(log, 50);
   CURRENT.status = "Fetching projects";
   log();
@@ -441,15 +445,20 @@ const Packager = require("@turbowarp/packager");
     spinner = spinners[SPINNER_INDEX % spinners.length];
     spinner = `${spinner[Math.floor(Date.now() / 50) % spinner.length]}`;
     if (Object.entries(CURRENT.projects).length) {
-      CURRENT.status = `Downloading projects ${
-        `[${
-          Object.values(CURRENT.projects).filter((i) => i.includes("Finished"))
-            .length
-        }/${Object.keys(CURRENT.projects).length}]`.yellow
-      }`;
+      const AMT = `[${
+        Object.values(CURRENT.projects).filter((i) => i.includes("Finished"))
+          .length
+      }/${Object.keys(CURRENT.projects).length}]`.brightBlue;
+      CURRENT.status = `Downloading projects `.yellow + AMT;
     }
-
-    let logThis = `${spinner} ${CURRENT.status}`.yellow;
+    const HTMLIFIER = `
+    █░█ ▀█▀ █▀▄▀█ █░░ █ █▀▀ █ █▀▀ █▀█
+    █▀█ ░█░ █░▀░█ █▄▄ █ █▀░ █ ██▄ █▀▄`
+      .split("\n")
+      .map((i) => i.trim())
+      .join("\n");
+    let logThis = `\n\n${HTMLIFIER}\n\n\n${spinner} ${CURRENT.status}`.yellow;
+    logThis = logThis;
 
     if (Object.entries(CURRENT.projects).length) {
       logThis += "\n\n";
@@ -473,11 +482,10 @@ const Packager = require("@turbowarp/packager");
         .map(
           ([k, v]) =>
             `${
-              `[${niceslice(projects.find((i) => i.id == k).title)}]`.padStart(
-                45,
-                " "
-              ).yellow
-            }\t${v}`
+              `[${niceslice(
+                projects.find((i) => i.id == k).title.trim()
+              )}]`.padEnd(45, " ").yellow
+            }    ${v}`
         )
         .join("\n");
       if (newlog.trim().length) {
@@ -519,4 +527,15 @@ function throttle(callback, limit) {
 }
 function niceslice(str, len = 30) {
   return str.length >= len ? str.slice(0, len - 3) + "..." : str;
+}
+
+function center(text) {
+  let lines = text.split("\n");
+  let terminalColumns = process.stdout.columns;
+  for (let i in lines) {
+    lines[i] = lines[i]
+      .padStart(Math.floor(terminalColumns / 2 + lines[i].length / 2), " ")
+      .padEnd(terminalColumns, " ");
+  }
+  return lines.join("\n");
 }
