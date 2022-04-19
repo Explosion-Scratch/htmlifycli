@@ -1,7 +1,7 @@
 {
   "name": "htmlifycli",
   "description": "A beautiful CLI for HTMLifying scratch projects.",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "main": "index.js",
   "license": "MIT",
   "bin": {
