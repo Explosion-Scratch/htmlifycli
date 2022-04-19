@@ -7,8 +7,8 @@ const Packager = require("@turbowarp/packager");
 const dataURL = require("image-data-uri");
 
 (async () => {
-  const popupScript = fs.readFileSync("./popup.js", "utf-8");
-  const CUSTOM_STYLE = fs.readFileSync("./css.css", "utf-8");
+  const popupScript = fs.readFileSync(join(__dirname, "popup.js"), "utf-8");
+  const CUSTOM_STYLE = fs.readFileSync(join(__dirname, "css.css"), "utf-8");
   const FAKE_WAIT_TIME = 200;
   const SANITIZE_RE = /[/\\?%*:|"<>]/g;
   console.clear();
