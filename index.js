@@ -134,7 +134,15 @@ const Packager = require("@turbowarp/packager");
       },
     ],
   };
-
+  const sort = {
+    dateAsc: "Newest to oldest",
+    dateDsc: "Oldest to newest",
+    loves: "Loves",
+    favorites: "Favorites",
+    views: "Views",
+    remixes: "Remixes",
+    modified: "Modified date",
+  };
   const sourceOptions = await inquirer.prompt([
     ...sources[source],
     ...(source === "id"
@@ -147,6 +155,14 @@ const Packager = require("@turbowarp/packager");
             message: "Project limit",
           },
         ]),
+    {
+      type: "list",
+      name: "sort",
+      message:
+        "How to sort projects (this will affect which projects get downloaded if cut off by max length)",
+      choices: Object.values(sort),
+      default: sort.dateAsc,
+    },
     {
       name: "target",
       message: "What output format do you want?",
@@ -175,6 +191,7 @@ const Packager = require("@turbowarp/packager");
     fullscreen: "Fullscreen",
     pause: "Pause",
   };
+
   let projectPrompt = [
     {
       type: "input",
@@ -238,7 +255,6 @@ const Packager = require("@turbowarp/packager");
       default: [buttons.pause, buttons.fullscreen],
     },
   ];
-
   const { customize } = await inquirer.prompt([
     {
       name: "customize",
@@ -269,7 +285,12 @@ const Packager = require("@turbowarp/packager");
       let out = [];
       let current = { length: 20 };
       let i = 0;
-      while (current.length >= 20 && out.length < opts.sourceOptions.limit) {
+      let LIMIT = Infinity;
+      if (opts.sourceOptions.sort === sort.dateAsc) {
+        // If it's not date ascending we have to get all the projects then sort
+        LIMIT = opts.sourceOptions.limit;
+      }
+      while (current.length >= 20 && out.length < LIMIT) {
         CURRENT.status = `Getting page ${i}` /*.brightBlue*/;
         let url = {
           user: () => `users/${opts.sourceOptions.user}/projects?`,
@@ -281,6 +302,31 @@ const Packager = require("@turbowarp/packager");
         ).then((res) => res.json());
         out.push(...current);
       }
+      out = sortBy(
+        out,
+        (item) => {
+          let s = opts.sourceOptions.sort;
+          if (s === sort.dateDsc) {
+            return new Date(item.history.created).getTime();
+          }
+          if (s === sort.modified) {
+            return new Date(item.history.modified).getTime();
+          }
+          if (s === sort.favorites) {
+            return item.stats.favorites;
+          }
+          if (s === sort.loves) {
+            return item.stats.loves;
+          }
+          if (s === sort.views) {
+            return item.stats.views;
+          }
+          if (s === sort.remixes) {
+            return item.stats.remixes;
+          }
+        },
+        true
+      );
       return out.slice(0, opts.sourceOptions.limit);
     }
   })();
@@ -462,6 +508,45 @@ const Packager = require("@turbowarp/packager");
 
     if (Object.entries(CURRENT.projects).length) {
       logThis += "\n\n";
+      function STAT(p) {
+        if (!p) {
+          return "";
+        }
+        // Return something like "❤️ 100k"
+        let s = opts.sourceOptions.sort;
+        let emojis = {
+          loves: "❤️",
+          favorites: "⭐",
+          views: "👁️‍🗨️",
+          remixes: "🌀",
+        };
+        let key = Object.entries(sort).find((i) => i[1] === s)[0];
+        if (!p.stats[key]) {
+          return "";
+        }
+        return `${emojis[key]}  ${nFormatter(p.stats[key], 2)}`;
+        function nFormatter(num, digits) {
+          const lookup = [
+            { value: 1, symbol: "" },
+            { value: 1e3, symbol: "k" },
+            { value: 1e6, symbol: "M" },
+            { value: 1e9, symbol: "G" },
+            { value: 1e12, symbol: "T" },
+            { value: 1e15, symbol: "P" },
+            { value: 1e18, symbol: "E" },
+          ];
+          const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
+          var item = lookup
+            .slice()
+            .reverse()
+            .find(function (item) {
+              return num >= item.value;
+            });
+          return item
+            ? (num / item.value).toFixed(digits).replace(rx, "$1") + item.symbol
+            : "0";
+        }
+      }
       let newlog = Object.entries(CURRENT.projects)
         .sort((a, b) => {
           // Get IDs
@@ -484,7 +569,8 @@ const Packager = require("@turbowarp/packager");
             `${
               `[${niceslice(
                 projects.find((i) => i.id == k).title.trim()
-              )}]`.padEnd(45, " ").yellow
+              )} ${STAT(projects.find((i) => i.id == k))}]`.padEnd(45, " ")
+                .yellow
             }    ${v}`
         )
         .join("\n");
@@ -538,4 +624,11 @@ function center(text) {
       .padEnd(terminalColumns, " ");
   }
   return lines.join("\n");
+}
+function sortBy(object, map, reverse = false) {
+  let out = object.sort((a, b) => map(a) - map(b));
+  if (reverse) {
+    return out.reverse();
+  }
+  return out;
 }
