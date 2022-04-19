@@ -1,0 +1,92 @@
+#info_btn {
+  color: #333;
+  font-weight: 900;
+  font-family: Montserrat, Roboto, sans-serif;
+  background: white;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  padding: 6px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  cursor: pointer;
+}
+#popout {
+  box-shadow: 2px 2px 10px #0001;
+  border-radius: 6px;
+  color: #333;
+  font-family: Montserrat, "Work Sans", Roboto, sans-serif;
+  background: white;
+  position: absolute;
+  width: 80vw;
+  height: 80vh;
+  max-width: 600px;
+  max-height: 600px;
+  top: 50%;
+  left: 50%;
+  overflow-y: scroll;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+}
+#popout #projectId {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: #666;
+}
+#popout .author {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+}
+#popout .bannerImg {
+  padding-top: 30px !important;
+}
+#popout .avatar {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  border-radius: 50%;
+}
+#popout h5 {
+  font-size: 1rem;
+}
+#popout .title {
+  display: flex;
+}
+#popout h5,
+#popout .instructions,
+#popout .description {
+  width: 70%;
+}
+#popout .description {
+  margin-bottom: 20px;
+}
+#popout textarea:focus {
+  outline: none;
+}
+#popout textarea {
+  border: none !important;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  height: "400px";
+}
+#popout #close {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #0001;
+  padding: 3px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  cursor: pointer;
+}

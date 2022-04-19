@@ -1,7 +1,7 @@
 {
   "name": "htmlifycli",
   "description": "A beautiful CLI for HTMLifying scratch projects.",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "main": "index.js",
   "license": "MIT",
   "bin": {
@@ -13,6 +13,7 @@
     "@turbowarp/packager": "^0.7.2",
     "colors": "^1.4.0",
     "cross-fetch": "^3.1.5",
+    "image-data-uri": "^2.0.1",
     "inquirer": "^8.2.0",
     "log-update": "^5.0.0"
   }

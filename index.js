@@ -4,8 +4,11 @@ require("colors");
 const inquirer = require("inquirer");
 const { join } = require("path");
 const Packager = require("@turbowarp/packager");
+const dataURL = require("image-data-uri");
 
 (async () => {
+  const popupScript = fs.readFileSync("./popup.js", "utf-8");
+  const CUSTOM_STYLE = fs.readFileSync("./css.css", "utf-8");
   const FAKE_WAIT_TIME = 200;
   const SANITIZE_RE = /[/\\?%*:|"<>]/g;
   console.clear();
@@ -401,6 +404,25 @@ const Packager = require("@turbowarp/packager");
           },
           controls: {
             ...btns,
+          },
+          custom: {
+            js: popupScript
+              .replace('"INSERT_HERE"', JSON.stringify(project))
+              .replace('"STYLE_HERE"', JSON.stringify(CUSTOM_STYLE))
+              .replace(
+                '"BANNER_IMAGE"',
+                JSON.stringify(
+                  await dataURL.encodeFromURL(project.images["200x200"])
+                )
+              )
+              .replace(
+                '"AUTHOR_IMAGE"',
+                JSON.stringify(
+                  await dataURL.encodeFromURL(
+                    project.author.profile.images["50x50"]
+                  )
+                )
+              ),
           },
         };
         Object.assign(packager.options, f);
