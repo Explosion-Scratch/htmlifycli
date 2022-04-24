@@ -385,6 +385,30 @@ const dataURL = require("image-data-uri");
             { enabled: projectOptions.buttons.includes(v) },
           ])
         );
+        let POPUP = "";
+
+        try {
+          POPUP = popupScript
+            .replace('"INSERT_HERE"', JSON.stringify(project))
+            .replace('"STYLE_HERE"', JSON.stringify(CUSTOM_STYLE))
+            .replace(
+              '"BANNER_IMAGE"',
+              JSON.stringify(
+                await dataURL.encodeFromURL(project.images["200x200"])
+              )
+            )
+            .replace(
+              '"AUTHOR_IMAGE"',
+              JSON.stringify(
+                await dataURL.encodeFromURL(
+                  project.author.profile.images["50x50"]
+                )
+              )
+            );
+        } catch (_) {
+          console.log("Caught error creating custom popup script");
+        }
+
         f = {
           loadingScreen: {
             progressBar: f.loadingBar,
@@ -406,23 +430,7 @@ const dataURL = require("image-data-uri");
             ...btns,
           },
           custom: {
-            js: popupScript
-              .replace('"INSERT_HERE"', JSON.stringify(project))
-              .replace('"STYLE_HERE"', JSON.stringify(CUSTOM_STYLE))
-              .replace(
-                '"BANNER_IMAGE"',
-                JSON.stringify(
-                  await dataURL.encodeFromURL(project.images["200x200"])
-                )
-              )
-              .replace(
-                '"AUTHOR_IMAGE"',
-                JSON.stringify(
-                  await dataURL.encodeFromURL(
-                    project.author.profile.images["50x50"]
-                  )
-                )
-              ),
+            js: POPUP,
           },
         };
         Object.assign(packager.options, f);
