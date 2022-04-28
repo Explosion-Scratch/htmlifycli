@@ -23,6 +23,7 @@ const dataURL = require("image-data-uri");
     id: "A single project from an ID",
     studio: "From a studio",
     user: "From a user's projects",
+    search: "Search and select projects",
   };
   let source = await inquirer.prompt([
     {
@@ -136,6 +137,14 @@ const dataURL = require("image-data-uri");
         validatingText: "Checking if project exists",
       },
     ],
+    search: [
+      {
+        type: "string",
+        name: "query",
+        default: "Flight simulator",
+        message: "What do you want to search for?",
+      },
+    ],
   };
   const sort = {
     dateAsc: "Newest to oldest",
@@ -206,7 +215,11 @@ const dataURL = require("image-data-uri");
       type: "input",
       name: "folder",
       message: "Folder to save projects in (will be created if non-existant)",
-      default: CURRENT.folderTitle || sourceOptions.user || "projects",
+      default:
+        CURRENT.folderTitle ||
+        sourceOptions.user ||
+        sourceOptions.query.replace(SANITIZE_RE, "_") ||
+        "projects",
     },
     {
       type: "number",
@@ -299,17 +312,26 @@ const dataURL = require("image-data-uri");
         // If it's not date ascending we have to get all the projects then sort
         LIMIT = opts.sourceOptions.limit;
       }
-      while (current.length >= 20 && out.length < LIMIT) {
+      projectLoop: while (current.length >= 20 && out.length < LIMIT) {
         CURRENT.status = `Getting page ${i}` /*.brightBlue*/;
         let url = {
-          user: () => `users/${opts.sourceOptions.user}/projects?`,
+          user: () => `users/${opts.sourceOptions.user}/projects?limit=20&`,
           studio: () => `studios/${opts.sourceOptions.id}/projects/?limit=20&`,
           id: () => `projects/${opts.sourceOptions.id}`,
+          search: () =>
+            `search/projects/?limit=20&language=en&q=${opts.sourceOptions.query}&`,
         };
         current = await fetch(
           `https://api.scratch.mit.edu/${url[opts.source]()}offset=${20 * i++}`
         ).then((res) => res.json());
         out.push(...current);
+        if (
+          opts.source === "search" &&
+          out.length > Math.min(200, opts.sourceOptions.limit * 2)
+        ) {
+          break projectLoop;
+        }
+        await new Promise((r) => setTimeout(r, 500));
       }
       out = sortBy(
         out,
@@ -339,6 +361,33 @@ const dataURL = require("image-data-uri");
       return out.slice(0, opts.sourceOptions.limit);
     }
   })();
+  if (opts.source === "search") {
+    CURRENT.override = "";
+    log();
+    console.clear();
+    CURRENT.return = true;
+    let mapped = projects.map(
+      (i) =>
+        `${niceslice(i.title, 24).padEnd(26, " ").yellow}${
+          " - ".dim
+        }${niceslice(i.author.username, 20).padEnd(23, " ")}`.blue +
+        `[${i.id}]`.padEnd(16, " ") +
+        `${STAT(i)}`
+    );
+    let { filtered } = await inquirer.prompt([
+      {
+        type: "checkbox",
+        name: "filtered",
+        message: "Select projects: ",
+        choices: mapped,
+        default: mapped,
+        loop: false,
+      },
+    ]);
+    filtered = filtered.map((i) => projects[mapped.indexOf(i)]);
+    CURRENT.return = false;
+    projects = filtered;
+  }
   CURRENT.projects = Object.fromEntries(
     projects.map((i) => [i.id, "Fetching".brightBlue])
   );
@@ -478,6 +527,9 @@ const dataURL = require("image-data-uri");
   process.exit(0);
 
   function log() {
+    if (CURRENT.return) {
+      return;
+    }
     if (CURRENT.override) {
       return logUpdate(CURRENT.override);
     }
@@ -561,45 +613,6 @@ const dataURL = require("image-data-uri");
 
     if (Object.entries(CURRENT.projects).length) {
       logThis += "\n\n";
-      function STAT(p) {
-        if (!p) {
-          return "";
-        }
-        // Return something like "❤️ 100k"
-        let s = opts.sourceOptions.sort;
-        let emojis = {
-          loves: "❤️",
-          favorites: "⭐",
-          views: "👁️‍🗨️",
-          remixes: "🌀",
-        };
-        let key = Object.entries(sort).find((i) => i[1] === s)[0];
-        if (!p.stats[key]) {
-          return "";
-        }
-        return `${emojis[key]}  ${nFormatter(p.stats[key], 2)}`;
-        function nFormatter(num, digits) {
-          const lookup = [
-            { value: 1, symbol: "" },
-            { value: 1e3, symbol: "k" },
-            { value: 1e6, symbol: "M" },
-            { value: 1e9, symbol: "G" },
-            { value: 1e12, symbol: "T" },
-            { value: 1e15, symbol: "P" },
-            { value: 1e18, symbol: "E" },
-          ];
-          const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
-          var item = lookup
-            .slice()
-            .reverse()
-            .find(function (item) {
-              return num >= item.value;
-            });
-          return item
-            ? (num / item.value).toFixed(digits).replace(rx, "$1") + item.symbol
-            : "0";
-        }
-      }
       let newlog = Object.entries(CURRENT.projects)
         .sort((a, b) => {
           // Get IDs
@@ -635,6 +648,45 @@ const dataURL = require("image-data-uri");
     }
 
     logUpdate(logThis);
+  }
+  function STAT(p) {
+    if (!p) {
+      return "";
+    }
+    // Return something like "❤️ 100k"
+    let s = opts.sourceOptions.sort;
+    let emojis = {
+      loves: "❤️",
+      favorites: "⭐",
+      views: "👁️‍🗨️",
+      remixes: "🌀",
+    };
+    let key = Object.entries(sort).find((i) => i[1] === s)[0];
+    if (!p.stats[key]) {
+      return "";
+    }
+    return `${emojis[key]}  ${nFormatter(p.stats[key], 2)}`;
+    function nFormatter(num, digits) {
+      const lookup = [
+        { value: 1, symbol: "" },
+        { value: 1e3, symbol: "k" },
+        { value: 1e6, symbol: "M" },
+        { value: 1e9, symbol: "G" },
+        { value: 1e12, symbol: "T" },
+        { value: 1e15, symbol: "P" },
+        { value: 1e18, symbol: "E" },
+      ];
+      const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
+      var item = lookup
+        .slice()
+        .reverse()
+        .find(function (item) {
+          return num >= item.value;
+        });
+      return item
+        ? (num / item.value).toFixed(digits).replace(rx, "$1") + item.symbol
+        : "0";
+    }
   }
 })();
 
