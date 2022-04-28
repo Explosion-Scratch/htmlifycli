@@ -173,6 +173,12 @@ const dataURL = require("image-data-uri");
       choices: ["zip", "html"],
       default: "html",
     },
+    {
+      type: "number",
+      name: "sync",
+      message: "How many projects to download at a time?",
+      default: 30,
+    },
   ]);
   sourceOptions.limit = sourceOptions.limit || 100;
   const features = {
@@ -343,121 +349,139 @@ const dataURL = require("image-data-uri");
   fs.mkdirSync(folder, { recursive: true });
   CURRENT.status = "Getting projects";
   log();
-  let projectPromises = [];
-  for (let i in projects) {
-    projectPromises.push(
-      (async () => {
-        let project = projects[i];
-        CURRENT.projects[project.id] = "Fetching".yellow;
-        let ab = await (
-          await fetch(`https://projects.scratch.mit.edu/${project.id}`)
-        ).arrayBuffer();
-        let formattedTitle = project.title.replace(SANITIZE_RE, "-");
-        const name = join(folder, formattedTitle);
-        if (fs.existsSync(name)) {
-          CURRENT.projects[project.id] =
-            `File already exists (${project.title.brightBlue})`.brightYellow;
-          log();
-        }
-        CURRENT.projects[project.id] = "Loading project".brightBlue;
-        log();
-        let loaded = await Packager.loadProject(ab, (type, a, b) => {
-          CURRENT.projects[project.id] = `${`[${type}]`.yellow} ${
-            typeof a === "string"
-              ? a
-              : a <= 1
-              ? `${~~(a * 100)}%`.brightGreen
-              : `${a} assets downloaded`.brightBlue
-          }`;
-        });
-        CURRENT.projects[project.id] = "Packaging".brightBlue;
-        log();
-        const packager = new Packager.Packager(loaded);
-        let f = Object.fromEntries(
-          Object.entries(features).map(([k, v]) => [
-            k,
-            projectOptions.features.includes(v),
-          ])
-        );
-        let btns = Object.fromEntries(
-          Object.entries(buttons).map(([k, v]) => [
-            k,
-            { enabled: projectOptions.buttons.includes(v) },
-          ])
-        );
-        let POPUP = "";
 
-        try {
-          POPUP = popupScript
-            .replace('"INSERT_HERE"', JSON.stringify(project))
-            .replace('"STYLE_HERE"', JSON.stringify(CUSTOM_STYLE))
-            .replace(
-              '"BANNER_IMAGE"',
-              JSON.stringify(
-                await dataURL.encodeFromURL(project.images["200x200"])
-              )
-            )
-            .replace(
-              '"AUTHOR_IMAGE"',
-              JSON.stringify(
-                await dataURL.encodeFromURL(
-                  project.author.profile.images["50x50"]
+  let currentChunk = 1;
+  let cks = [...chunks(projects, opts.sourceOptions.sync)];
+  for (let chunk of cks) {
+    let projectPromises = [];
+    for (let project of chunk) {
+      projectPromises.push(
+        (async () => {
+          CURRENT.projects[project.id] = "Fetching".yellow;
+          let ab = await (
+            await fetch(`https://projects.scratch.mit.edu/${project.id}`)
+          ).arrayBuffer();
+          let formattedTitle = project.title.replace(SANITIZE_RE, "-");
+          const name = join(folder, formattedTitle);
+          if (fs.existsSync(name)) {
+            CURRENT.projects[project.id] =
+              `File already exists (${project.title.brightBlue})`.brightYellow;
+            log();
+          }
+          CURRENT.projects[project.id] = "Loading project".brightBlue;
+          log();
+          let loaded = await Packager.loadProject(ab, (type, a, b) => {
+            CURRENT.projects[project.id] = `${`[${type}]`.yellow} ${
+              typeof a === "string"
+                ? a
+                : a <= 1
+                ? `${~~(a * 100)}%`.brightGreen
+                : `${a} assets downloaded`.brightBlue
+            }`;
+          });
+          CURRENT.projects[project.id] = "Packaging".brightBlue;
+          log();
+          const packager = new Packager.Packager(loaded);
+          let f = Object.fromEntries(
+            Object.entries(features).map(([k, v]) => [
+              k,
+              projectOptions.features.includes(v),
+            ])
+          );
+          let btns = Object.fromEntries(
+            Object.entries(buttons).map(([k, v]) => [
+              k,
+              { enabled: projectOptions.buttons.includes(v) },
+            ])
+          );
+          let POPUP = "";
+
+          try {
+            POPUP = popupScript
+              .replace('"INSERT_HERE"', JSON.stringify(project))
+              .replace('"STYLE_HERE"', JSON.stringify(CUSTOM_STYLE))
+              .replace(
+                '"BANNER_IMAGE"',
+                JSON.stringify(
+                  await dataURL.encodeFromURL(project.images["200x200"])
                 )
               )
-            );
-        } catch (_) {
-          console.log("Caught error creating custom popup script");
-        }
+              .replace(
+                '"AUTHOR_IMAGE"',
+                JSON.stringify(
+                  await dataURL.encodeFromURL(
+                    project.author.profile.images["50x50"]
+                  )
+                )
+              );
+          } catch (_) {
+            //console.log("Caught error creating custom popup script");
+          }
 
-        f = {
-          loadingScreen: {
-            progressBar: f.loadingBar,
-            text: project.title,
-          },
-          compiler: {
-            enabled: f.compilerEnable,
-          },
-          ...f,
-          target: sourceOptions.target,
-          ...projectOptions,
-          app: {
-            icon: null,
-            packageName: formattedTitle,
-            windowTitle: formattedTitle,
-            windowMode: "window",
-          },
-          controls: {
-            ...btns,
-          },
-          custom: {
-            js: POPUP,
-          },
-        };
-        Object.assign(packager.options, f);
-        packager.project = loaded;
-        const { type, data } = await packager.package();
-        if (data instanceof ArrayBuffer) {
-          data = new Uint8Array(data);
-        }
-        CURRENT.projects[project.id] = "Writing file".green;
-        log();
-        fs.writeFileSync(`${name}.${type.split("/")[1]}`, data);
-        CURRENT.projects[project.id] = "Finished".green;
-        log();
-      })()
-    );
+          f = {
+            loadingScreen: {
+              progressBar: f.loadingBar,
+              text: project.title,
+            },
+            compiler: {
+              enabled: f.compilerEnable,
+            },
+            ...f,
+            target: sourceOptions.target,
+            ...projectOptions,
+            app: {
+              icon: null,
+              packageName: formattedTitle,
+              windowTitle: formattedTitle,
+              windowMode: "window",
+            },
+            controls: {
+              ...btns,
+            },
+            custom: {
+              js: POPUP,
+            },
+          };
+          Object.assign(packager.options, f);
+          packager.project = loaded;
+          const { type, data } = await packager.package();
+          if (data instanceof ArrayBuffer) {
+            data = new Uint8Array(data);
+          }
+          CURRENT.projects[project.id] = "Writing file".green;
+          log();
+          fs.writeFileSync(`${name}.${type.split("/")[1]}`, data);
+          CURRENT.projects[project.id] = "Finished".green;
+          log();
+        })()
+      );
+    }
+    await Promise.all(projectPromises);
+    if (currentChunk !== cks.length) {
+      CURRENT.override = `✅ ${
+        `Finished page ${currentChunk++} of ${cks.length}`.green
+      }`;
+      log();
+      await new Promise((r) => setTimeout(r, 2000));
+      CURRENT.override = null;
+    }
   }
 
-  Promise.all(projectPromises).then(
-    (p) => (
-      (projects = p),
-      (CURRENT.status = "Finished"),
-      logUpdate(`✅ ${`Finished`.green}`),
-      process.exit(0)
-    )
-  );
+  function* chunks(arr, n) {
+    for (let i = 0; i < arr.length; i += n) {
+      yield arr.slice(i, i + n);
+    }
+  }
+
+  projects = p;
+  CURRENT.status = "Finished";
+  logUpdate(`✅ ${`Finished`.green}`);
+  process.exit(0);
 
   function log() {
+    if (CURRENT.override) {
+      return logUpdate(CURRENT.override);
+    }
     // Change every 10 seconds
     const SPINNER_INDEX = ~~(Date.now() / 10000);
     let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
