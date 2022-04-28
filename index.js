@@ -234,7 +234,7 @@ const dataURL = require("image-data-uri");
     {
       name: "maxClones",
       message: "Maximum clones",
-      default: 1000,
+      default: 10000,
       type: "number",
     },
     {
@@ -473,7 +473,6 @@ const dataURL = require("image-data-uri");
     }
   }
 
-  projects = p;
   CURRENT.status = "Finished";
   logUpdate(`✅ ${`Finished`.green}`);
   process.exit(0);
