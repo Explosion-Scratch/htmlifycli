@@ -7,6 +7,15 @@ const Packager = require("@turbowarp/packager");
 const dataURL = require("image-data-uri");
 
 (async () => {
+  let PROXY = "";
+
+  const _fetch = (url, opts = {}) => {
+    opts.headers = opts.headers || {};
+    opts.headers["User-Agent"] =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36";
+    return fetch(getProxy(PROXY, url), opts);
+  };
+
   const popupScript = fs.readFileSync(join(__dirname, "popup.js"), "utf-8");
   const CUSTOM_STYLE = fs.readFileSync(join(__dirname, "css.css"), "utf-8");
   const FAKE_WAIT_TIME = 200;
@@ -25,6 +34,35 @@ const dataURL = require("image-data-uri");
     user: "From a user's projects",
     search: "Search and select projects",
   };
+
+  const proxies = Object.entries({
+    None: "",
+    "Cloudflare hosted proxy": "https://cors.explosion.workers.dev?{{encoded}}",
+    "Repl.it hosted proxy": "https://cors.explosionscratc.repl.co/{{noproto}}",
+  }).map((i) => ({ name: i[0], value: i[1] }));
+
+  let { proxy } = await inquirer.prompt([
+    {
+      name: "proxy",
+      type: "list",
+      message: "What CORS proxy would you like to use?",
+      choices: proxies,
+      default: "",
+      filter: async (proxy) => {
+        let r = await fetch(
+          getProxy(proxy, "https://api.scratch.mit.edu")
+        ).then((res) => res.json());
+        if (r.response || !(r.help && r.api && r.website)) {
+          throw new Error("API test request failed");
+        } else {
+          return proxy;
+        }
+      },
+    },
+  ]);
+
+  PROXY = proxy;
+
   let source = await inquirer.prompt([
     {
       name: "source",
@@ -45,7 +83,7 @@ const dataURL = require("image-data-uri");
         default: "griffpatch",
         validate: async (id) => {
           await new Promise((r) => setTimeout(r, FAKE_WAIT_TIME));
-          let { code, message } = await fetch(
+          let { code, message } = await _fetch(
             `https://api.scratch.mit.edu/users/${encodeURIComponent(id)}`
           ).then((r) => r.json());
           if (code) {
@@ -88,7 +126,7 @@ const dataURL = require("image-data-uri");
         default: "25020410",
         validate: async (id) => {
           await new Promise((r) => setTimeout(r, FAKE_WAIT_TIME));
-          let { code, title } = await fetch(
+          let { code, title } = await _fetch(
             `https://api.scratch.mit.edu/studios/${encodeURIComponent(id)}`
           ).then((r) => r.json());
           if (code) {
@@ -122,7 +160,7 @@ const dataURL = require("image-data-uri");
         message: "What's the project ID of the project?",
         validate: async (id) => {
           await new Promise((r) => setTimeout(r, FAKE_WAIT_TIME));
-          let res = await fetch(
+          let res = await _fetch(
             `https://api.scratch.mit.edu/projects/${encodeURIComponent(id)}`
           ).then((r) => r.json());
           let { code, title } = res;
@@ -295,11 +333,12 @@ const dataURL = require("image-data-uri");
   CURRENT.logInterval = setInterval(log, 50);
   CURRENT.status = "Fetching projects";
   log();
+
   let projects = await (async () => {
     if (opts.source === "id") {
       return [
         CURRENT.project ||
-          (await fetch(
+          (await _fetch(
             `https://api.scratch.mit.edu/projects/${opts.sourceOptions.id}`
           ).then((res) => res.json())),
       ];
@@ -321,9 +360,14 @@ const dataURL = require("image-data-uri");
           search: () =>
             `search/projects/?limit=20&language=en&q=${opts.sourceOptions.query}&`,
         };
-        current = await fetch(
+        current = await _fetch(
           `https://api.scratch.mit.edu/${url[opts.source]()}offset=${20 * i++}`
         ).then((res) => res.json());
+        if (!Array.isArray(current)) {
+          console.clear();
+          console.error(current);
+          throw new Error("API Response invalid");
+        }
         out.push(...current);
         if (
           opts.source === "search" &&
@@ -408,7 +452,7 @@ const dataURL = require("image-data-uri");
         (async () => {
           CURRENT.projects[project.id] = "Fetching".yellow;
           let ab = await (
-            await fetch(`https://projects.scratch.mit.edu/${project.id}`)
+            await _fetch(`https://projects.scratch.mit.edu/${project.id}`)
           ).arrayBuffer();
           let formattedTitle = project.title.replace(SANITIZE_RE, "-");
           const name = join(folder, formattedTitle);
@@ -677,7 +721,7 @@ const dataURL = require("image-data-uri");
         { value: 1e18, symbol: "E" },
       ];
       const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
-      var item = lookup
+      let item = lookup
         .slice()
         .reverse()
         .find(function (item) {
@@ -701,21 +745,39 @@ function trycatch(fn) {
     }
   };
 }
-function throttle(callback, limit) {
-  var waiting = false; // Initially, we're not waiting
+
+function throttle(func, wait, options = {}) {
+  var context, args, result;
+  var timeout = null;
+  var previous = 0;
+  if (!options) options = {};
+  var later = function () {
+    previous = options.leading === false ? 0 : Date.now();
+    timeout = null;
+    result = func.apply(context, args);
+    if (!timeout) context = args = null;
+  };
   return function () {
-    // We return a throttled function
-    if (!waiting) {
-      // If we're not waiting
-      callback.apply(this, arguments); // Execute users function
-      waiting = true; // Prevent future invocations
-      setTimeout(function () {
-        // After a period of time
-        waiting = false; // And allow future invocations
-      }, limit);
+    var now = Date.now();
+    if (!previous && options.leading === false) previous = now;
+    var remaining = wait - (now - previous);
+    context = this;
+    args = arguments;
+    if (remaining <= 0 || remaining > wait) {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      previous = now;
+      result = func.apply(context, args);
+      if (!timeout) context = args = null;
+    } else if (!timeout && options.trailing !== false) {
+      timeout = setTimeout(later, remaining);
     }
+    return result;
   };
 }
+
 function niceslice(str, len = 30) {
   return str.length >= len ? str.slice(0, len - 3) + "..." : str;
 }
@@ -736,4 +798,14 @@ function sortBy(object, map, reverse = false) {
     return out.reverse();
   }
   return out;
+}
+
+function getProxy(p, url) {
+  if (!p.toString().length) {
+    return url;
+  }
+  return p
+    .toString()
+    .replaceAll("{{noproto}}", url.split("//")[1])
+    .replaceAll("{{encoded}}", encodeURIComponent(url));
 }
