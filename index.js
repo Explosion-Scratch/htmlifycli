@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const fs = require("fs");
 const fetch = require("cross-fetch");
 require("colors");
